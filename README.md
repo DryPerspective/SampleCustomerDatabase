@@ -24,5 +24,5 @@ The user can perform as many of the above features as they please per run of the
 
 ## Notes on the Code
 
-This was compiled in the C++17 standard using Visual Studio for Windows 10, but to my knowledge does not use any platform-specific code. Other than standard library includes, it requires [SQLite](https://sqlite.org/index.html) to compile. SQLite is not included with the source code and must be downloaded separately, however I will include a pre-compiled version under releases.
+This was compiled in the C++17 standard using Visual Studio for Windows 10, but to my knowledge does not use any platform-specific code. Other than standard library includes, it requires [SQLite](https://sqlite.org/index.html) to compile. SQLite is not included with the source code and must be downloaded separately, however I will include a pre-compiled version of the project under releases.
 
