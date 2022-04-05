@@ -1,4 +1,15 @@
-#include "CustomerTracker.h"
+//#include "CustomerTracker.h"
+
+//Standard library includes
+#include <iostream>
+#include <stdio.h>
+#include <string> //For easy string handling
+#include <limits> //To ignore bad input through the console
+#include <vector> //To store IDs in certain circumstances.
+
+//Third party includes
+#include<sqlite3.h>
+
 
 
 // Here we create a callback function to handle our sql commands. Parameters are as follows:
@@ -21,7 +32,7 @@ int callback(void* NotUsed, int argc, char** argv, char** azColName) {
 
 //This function wraps around executing pre-made SQL statements, while also providing confirmation printed to the console that they executed properly, or an error message if they did not.
 //NB: As this does not use prepared statements, it should only be used for SQL statements with no user input, to prevent injection.
-void executeStatement(std::string& inStmt, sqlite3* inDB, bool showMessages) {
+void executeStatement(std::string& inStmt, sqlite3* inDB, bool showMessages = true) {
 	char* zErrorMsg;
 	int status{ sqlite3_exec(inDB, inStmt.c_str(), callback, 0, &zErrorMsg) };
 	if (status!=SQLITE_OK && showMessages) {
@@ -33,7 +44,7 @@ void executeStatement(std::string& inStmt, sqlite3* inDB, bool showMessages) {
 }
 
 //Alias of the above function to handle c-style string input.
-void executeStatement(const char* inStmt, sqlite3* inDB, bool showMessages) {
+void executeStatement(const char* inStmt, sqlite3* inDB, bool showMessages = true) {
 	std::string newString{ inStmt };
 	executeStatement(newString, inDB, showMessages);
 }
@@ -103,7 +114,7 @@ void trimWhiteSpace(std::string& inString) {
 
 
 //A function to run a SELECT COUNT statement on the db and return the result. If an error occurs, it returns -1.
-//NB: This function does not protect from injection. DO NOT CALL IT with user-entered data.
+//NB: This function does not protect from injection. DO NOT CALL IT with user-entered data. This is due to limitations in binding column names to a statement
 int selectCount(sqlite3* db, const std::string& colName, const std::string& tableName) {
 	std::string statement{ "SELECT COUNT(" + colName + ") FROM " + tableName + ";" };	//We can't use prepared statements and bindings on table names and column names, so we have to do this.
 	sqlite3_stmt* statementHandle;
@@ -216,6 +227,8 @@ int getCustomerID(sqlite3* db, const std::string& inShortName) {
 	return customerID;
 }
 
+
+
 //This function prints all of the addresses associated with a particular customer short name, and has the user pick a valid address ID from that list.
 int getAddressID(sqlite3* inDB, const std::string& inShortName) {
 	int customerID{ getCustomerID(inDB,inShortName) };	//Get the customer's ID.
@@ -286,6 +299,50 @@ int getAddressID(sqlite3* inDB, const std::string& inShortName) {
 	std::cout << '\n';
 
 	return addressID;
+}
+
+//This function exists to provide some pre-made sample data to the DB, and should be run if you're starting with an empty DB (or no DB at all).
+// I would ordinarily place it above main as per usual convention, but it's a huge block of ugly SQL code which will only ever be used once to generate a new set of sample data, so I've left it here.
+// While technically the INSERT OR IGNORE status means we could run this function at every program startup, I figure it's best to only run it when necessary.
+void insertSampleData(sqlite3* inDB) {
+	std::string stmt;
+	stmt = "INSERT OR IGNORE INTO Customers (Customer_ID, Customer_Short_Name, First_Name, Last_Name,  Group_Name, Credit_Limit,  Outstanding_Credit, Created_On, Updated_On) VALUES( 1, 'JSMITH', 'John', 'Smith',  'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(2,'MSMITH', 'Mary', 'Smith', 'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(3,'BSMITH','Bob', 'Smith', 'SMITH FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(4,'BJONES', 'Brian', 'Jones', 'JONES FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(5,'DTRACEY', 'Donald', 'Tracey', 'TRACEY FAMILY', ' 3000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(6, 'ABAKER', 'Anthony', 'Baker', 'BAKER FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(7, 'AMCKECHNIE','Alastair', 'McKechnie', 'MCKECHNIE FAMILY', ' 7000', ' 0', DATE('now'), DATE('now')); \
+\
+	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(8, 'RGOULDING', 'Robert', 'Goulding', 'GOULDING', ' 5000', ' 0', DATE('now'), DATE('now')); ";
+
+	std::cout << "Adding sample Customer data:\n";
+	executeStatement(stmt, inDB);
+
+	stmt = "INSERT OR IGNORE INTO  CustomerAddress (Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(1,(select Customer_id from Customers where Customer_Short_Name = 'JSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
+		\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(2,(select Customer_ID from Customers where Customer_Short_Name = 'MSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
+	\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(3,(select Customer_ID from Customers where Customer_Short_Name = 'BSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
+	\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(4,(select Customer_ID from Customers where Customer_Short_Name = 'JSMITH'), 'WORK', '', '26 Lombard Street', 'London', 'EC4', '', '', DATE('now'), DATE('now')); \
+	\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(5,(select Customer_ID from Customers where Customer_Short_Name = 'DTRACEY'), 'HOME', '', '5 Bright Street', 'Dorking', 'Surrey', '', '', DATE('now'), DATE('now')); \
+	\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(6,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'HOME', '', '21 Hope Street', 'Barnet', 'Middlesex', '', '', DATE('now'), DATE('now')); \
+	\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(7,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'WORK', '', '1 Canada Square', 'Canary Wharf', 'London', '', '', DATE('now'), DATE('now')); \
+	\
+		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(8,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'UNKNOWN', '', '17 Broad Street', 'London', 'EC3', '', '', DATE('now'), DATE('now'));";
+
+	std::cout << "Adding sample Address data: \n";
+	executeStatement(stmt, inDB);
 }
 
 
@@ -921,46 +978,3 @@ int main(){
 }
 
 
-//This function exists to provide some pre-made sample data to the DB, and should be run if you're starting with an empty DB (or no DB at all).
-// I would ordinarily place it above main as per usual convention, but it's a huge block of ugly SQL code which will only ever be used once to generate a new set of sample data, so I've left it here.
-// While technically the INSERT OR IGNORE status means we could run this function at every program startup, I figure it's best to only run it when necessary.
-void insertSampleData(sqlite3* inDB) {
-	std::string stmt;
-	stmt = "INSERT OR IGNORE INTO Customers (Customer_ID, Customer_Short_Name, First_Name, Last_Name,  Group_Name, Credit_Limit,  Outstanding_Credit, Created_On, Updated_On) VALUES( 1, 'JSMITH', 'John', 'Smith',  'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(2,'MSMITH', 'Mary', 'Smith', 'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(3,'BSMITH','Bob', 'Smith', 'SMITH FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(4,'BJONES', 'Brian', 'Jones', 'JONES FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(5,'DTRACEY', 'Donald', 'Tracey', 'TRACEY FAMILY', ' 3000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(6, 'ABAKER', 'Anthony', 'Baker', 'BAKER FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(7, 'AMCKECHNIE','Alastair', 'McKechnie', 'MCKECHNIE FAMILY', ' 7000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(8, 'RGOULDING', 'Robert', 'Goulding', 'GOULDING', ' 5000', ' 0', DATE('now'), DATE('now')); ";
-
-	std::cout << "Adding sample Customer data:\n";
-	executeStatement(stmt, inDB);
-
-	stmt = "INSERT OR IGNORE INTO  CustomerAddress (Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(1,(select Customer_id from Customers where Customer_Short_Name = 'JSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
-		\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(2,(select Customer_ID from Customers where Customer_Short_Name = 'MSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(3,(select Customer_ID from Customers where Customer_Short_Name = 'BSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(4,(select Customer_ID from Customers where Customer_Short_Name = 'JSMITH'), 'WORK', '', '26 Lombard Street', 'London', 'EC4', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(5,(select Customer_ID from Customers where Customer_Short_Name = 'DTRACEY'), 'HOME', '', '5 Bright Street', 'Dorking', 'Surrey', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(6,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'HOME', '', '21 Hope Street', 'Barnet', 'Middlesex', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(7,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'WORK', '', '1 Canada Square', 'Canary Wharf', 'London', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(8,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'UNKNOWN', '', '17 Broad Street', 'London', 'EC3', '', '', DATE('now'), DATE('now'));";
-
-	std::cout << "Adding sample Address data: \n";
-	executeStatement(stmt, inDB);
-}
