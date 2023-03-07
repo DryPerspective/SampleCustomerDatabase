@@ -1,4 +1,15 @@
-#include "CustomerTracker.h"
+//#include "CustomerTracker.h"
+
+//Standard library includes
+#include <iostream>
+#include <stdio.h>
+#include <string> //For easy string handling
+#include <limits> //To ignore bad input through the console
+#include <vector> //To store IDs in certain circumstances.
+
+//Third party includes
+#include<sqlite3.h>
+
 
 
 // Here we create a callback function to handle our sql commands. Parameters are as follows:
@@ -21,7 +32,7 @@ int callback(void* NotUsed, int argc, char** argv, char** azColName) {
 
 //This function wraps around executing pre-made SQL statements, while also providing confirmation printed to the console that they executed properly, or an error message if they did not.
 //NB: As this does not use prepared statements, it should only be used for SQL statements with no user input, to prevent injection.
-void executeStatement(std::string& inStmt, sqlite3* inDB, bool showMessages) {
+void executeStatement(const std::string& inStmt, sqlite3* inDB, bool showMessages = true) {
 	char* zErrorMsg;
 	int status{ sqlite3_exec(inDB, inStmt.c_str(), callback, 0, &zErrorMsg) };
 	if (status!=SQLITE_OK && showMessages) {
@@ -30,12 +41,6 @@ void executeStatement(std::string& inStmt, sqlite3* inDB, bool showMessages) {
 	else if(status == SQLITE_OK && showMessages){
 		std::cout << "Statement executed successfully.\n";
 	}
-}
-
-//Alias of the above function to handle c-style string input.
-void executeStatement(const char* inStmt, sqlite3* inDB, bool showMessages) {
-	std::string newString{ inStmt };
-	executeStatement(newString, inDB, showMessages);
 }
 
 //A function which gets an int value through the console, with input validation.
@@ -71,7 +76,6 @@ int getIntBetween(int inMin, int inMax) {
 
 //A function to read whether the user has entered a y/n yes/no into the console.
 bool getYesNo() {
-	//We have to loop here for inpute validation
 	while (true) {
 		char inputChar{};
 		std::cin >> inputChar; //Read in our char
@@ -97,13 +101,13 @@ void trimWhiteSpace(std::string& inString) {
 	size_t startOfWord{ inString.find_first_not_of(" \n\r\t\f\v") };
 	size_t endOfWord{ inString.find_last_not_of(" \n\r\t\f\v") };
 
-	if (startOfWord != std::string::npos && endOfWord != std::string::npos)inString = std::move(inString.substr(startOfWord, endOfWord - startOfWord + 1));
+	if (startOfWord != std::string::npos && endOfWord != std::string::npos) inString = std::move(inString.substr(startOfWord, endOfWord - startOfWord + 1));
 	else std::cerr << "Error: Trimming of whitespace failed.\n";
 }
 
 
 //A function to run a SELECT COUNT statement on the db and return the result. If an error occurs, it returns -1.
-//NB: This function does not protect from injection. DO NOT CALL IT with user-entered data.
+//NB: This function does not protect from injection. DO NOT CALL IT with user-entered data. This is due to limitations in binding column names to a statement
 int selectCount(sqlite3* db, const std::string& colName, const std::string& tableName) {
 	std::string statement{ "SELECT COUNT(" + colName + ") FROM " + tableName + ";" };	//We can't use prepared statements and bindings on table names and column names, so we have to do this.
 	sqlite3_stmt* statementHandle;
@@ -216,6 +220,8 @@ int getCustomerID(sqlite3* db, const std::string& inShortName) {
 	return customerID;
 }
 
+
+
 //This function prints all of the addresses associated with a particular customer short name, and has the user pick a valid address ID from that list.
 int getAddressID(sqlite3* inDB, const std::string& inShortName) {
 	int customerID{ getCustomerID(inDB,inShortName) };	//Get the customer's ID.
@@ -288,6 +294,50 @@ int getAddressID(sqlite3* inDB, const std::string& inShortName) {
 	return addressID;
 }
 
+//This function exists to provide some pre-made sample data to the DB, and should be run if you're starting with an empty DB (or no DB at all).
+// I would ordinarily place it above main as per usual convention, but it's a huge block of ugly SQL code which will only ever be used once to generate a new set of sample data, so I've left it here.
+// While technically the INSERT OR IGNORE status means we could run this function at every program startup, I figure it's best to only run it when necessary.
+void insertSampleData(sqlite3* inDB) {
+	std::string stmt;
+	stmt = "INSERT OR IGNORE INTO Customers (Customer_ID, Customer_Short_Name, First_Name, Last_Name,  Group_Name, Credit_Limit,  Outstanding_Credit, Created_On, Updated_On) VALUES( 1, 'JSMITH', 'John', 'Smith',  'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(2,'MSMITH', 'Mary', 'Smith', 'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(3,'BSMITH','Bob', 'Smith', 'SMITH FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(4,'BJONES', 'Brian', 'Jones', 'JONES FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(5,'DTRACEY', 'Donald', 'Tracey', 'TRACEY FAMILY', ' 3000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(6, 'ABAKER', 'Anthony', 'Baker', 'BAKER FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(7, 'AMCKECHNIE','Alastair', 'McKechnie', 'MCKECHNIE FAMILY', ' 7000', ' 0', DATE('now'), DATE('now')); "
+
+	"INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(8, 'RGOULDING', 'Robert', 'Goulding', 'GOULDING', ' 5000', ' 0', DATE('now'), DATE('now')); ";
+
+	std::cout << "Adding sample Customer data:\n";
+	executeStatement(stmt, inDB);
+
+	stmt = "INSERT OR IGNORE INTO  CustomerAddress (Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(1,(select Customer_id from Customers where Customer_Short_Name = 'JSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); "
+		
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(2,(select Customer_ID from Customers where Customer_Short_Name = 'MSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); "
+	
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(3,(select Customer_ID from Customers where Customer_Short_Name = 'BSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); "
+	
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(4,(select Customer_ID from Customers where Customer_Short_Name = 'JSMITH'), 'WORK', '', '26 Lombard Street', 'London', 'EC4', '', '', DATE('now'), DATE('now')); "
+	
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(5,(select Customer_ID from Customers where Customer_Short_Name = 'DTRACEY'), 'HOME', '', '5 Bright Street', 'Dorking', 'Surrey', '', '', DATE('now'), DATE('now')); "
+	
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(6,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'HOME', '', '21 Hope Street', 'Barnet', 'Middlesex', '', '', DATE('now'), DATE('now')); "
+	
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(7,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'WORK', '', '1 Canada Square', 'Canary Wharf', 'London', '', '', DATE('now'), DATE('now')); "
+	
+		"INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(8,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'UNKNOWN', '', '17 Broad Street', 'London', 'EC3', '', '', DATE('now'), DATE('now'));";
+
+	std::cout << "Adding sample Address data: \n";
+	executeStatement(stmt, inDB);
+}
+
 
 int main(){
 	//Declare our db
@@ -298,16 +348,8 @@ int main(){
 	sqlite3_stmt* preparedStatement;			//Our prepared statement handle used for when we need to go through the sqlite_prepare_v2() process. 
 	std::string inputLine{ "DEFAULT VALUE SHOULD NEVER BE USED" };	//An all-purpose string to store input from the user.
 
-	//Below are the integers used to handle sqlite errors. Sqlite functions return an int corresponding to the success or failure of the function, which can be evaluated to find the error code.
-	//As these are going to be used and reused as we go along, they are declared upfront. This should prevent potential issues from name shadowing and other potential scoping pitfalls.
-	int prepStatus;
-	int bindStatus;
-	int stepStatus;
-	int openStatus;
-	int closeStatus;
-
 	//Use an int to ensure we could make the connection properly
-	openStatus = sqlite3_open("Customers.db", &db);
+	auto openStatus = sqlite3_open("Customers.db", &db);
 
 	//If there was an error.
 	if (openStatus != SQLITE_OK) {
@@ -362,10 +404,10 @@ int main(){
 	//Now to see if the table is empty, and populate it with sample data if so.
 	int customerCount{ -1 };	//Initialise to -1 as it will never be given as an answer for the number of rows in a table.
 	//We use the sql statement in the below line as it is slightly more efficient than a simple SELECT COUNT(*) FROM TABLE.
-	prepStatus = sqlite3_prepare_v2(db, "SELECT CASE WHEN EXISTS (SELECT * FROM Customers) THEN 1 ELSE 0 END", -1, &preparedStatement, NULL);
+	auto prepStatus = sqlite3_prepare_v2(db, "SELECT CASE WHEN EXISTS (SELECT * FROM Customers) THEN 1 ELSE 0 END", -1, &preparedStatement, NULL);
 	if (prepStatus != SQLITE_OK) std::cerr << "Error reading table size. Error code:" << sqlite3_errmsg(db) << '\n';				//If we don't get a result of SQLITE_OK then something went wrong with this statement.
 	else {
-		stepStatus = sqlite3_step(preparedStatement);
+		auto stepStatus = sqlite3_step(preparedStatement);
 		if(stepStatus != SQLITE_ROW) std::cerr<< "Error stepping into count table:" << sqlite3_errmsg(db) << '\n';		//We expect a result of SQLITE_ROW, meaning that we can process the row in the result table.
 		else {
 			customerCount = sqlite3_column_int(preparedStatement, 0);			//Get the result of the statement.
@@ -412,7 +454,7 @@ int main(){
 
 		case 1: 				//-------VIEW DATA------//
 		{
-			//This case is put into its own scope to prevent errors when initialising the below two variables.
+			
 			int customerCount{ selectCount(db,"*","Customers") };
 			int addressCount{ selectCount(db,"*","CustomerAddress") };
 			if (customerCount != -1 && addressCount != -1) {		//If we got the values correctly.
@@ -517,7 +559,7 @@ int main(){
 					if (prepStatus != SQLITE_OK)std::cerr << "Error preparing INSERT statement:" << sqlite3_errmsg(db) << '\n';
 
 					//And while we're here, we can bind our unique shortname into the statement.
-					bindStatus = sqlite3_bind_text(preparedStatement, 1, insertShortName.c_str(), -1, NULL);
+					auto bindStatus = sqlite3_bind_text(preparedStatement, 1, insertShortName.c_str(), -1, NULL);
 					if (bindStatus != SQLITE_OK)std::cerr << "Error binding short name to statement:" << sqlite3_errmsg(db) << '\n';
 
 
@@ -547,7 +589,7 @@ int main(){
 
 
 					//We can now try to evaluate the prepared statement.
-					stepStatus = sqlite3_step(preparedStatement);
+					auto stepStatus = sqlite3_step(preparedStatement);
 					if (stepStatus == SQLITE_DONE)std::cout << "Record added successfully.\n \n";
 					else std::cerr << "Error executing statement:" << sqlite3_errmsg(db) << '\n';
 
@@ -569,7 +611,7 @@ int main(){
 					if (prepStatus != SQLITE_OK)std::cerr << "Error preparing statement: " << sqlite3_errmsg(db) << '\n';
 
 					//Next we can bind our Customer_ID by binding the SELECT statement inside the INSERT values.
-					bindStatus = sqlite3_bind_text(preparedStatement, 1, inputShortName.c_str(), -1, SQLITE_TRANSIENT);
+					auto bindStatus = sqlite3_bind_text(preparedStatement, 1, inputShortName.c_str(), -1, SQLITE_TRANSIENT);
 					if (bindStatus != SQLITE_OK)std::cerr << "Error binding short name to statement: " << sqlite3_errmsg(db) << '\n';
 
 					//Next we need to fill our Address_Type field.
@@ -605,7 +647,7 @@ int main(){
 					bindValueOrNull(db, preparedStatement, 8, "Address Line 5");
 
 					//Execute the statement.
-					stepStatus = sqlite3_step(preparedStatement);
+					auto stepStatus = sqlite3_step(preparedStatement);
 					if (stepStatus == SQLITE_DONE)std::cout << "Record added successfully.\n";
 					else std::cerr << "Error adding record: " << sqlite3_errmsg(db) << '\n';
 
@@ -657,7 +699,7 @@ int main(){
 					std::string updateStatement;	//Declare this here as it's used in both cases.
 
 					switch (updateSelection) {
-					case 1:							//-------UPDATE NAME------//
+					case 1: {						//-------UPDATE NAME------//
 						updateStatement = "UPDATE Customers SET First_Name = ?,Last_Name = ?, Group_Name = ?, Updated_On = DATE('now') WHERE Customer_ID = ?;";
 						//Prepare our statement
 						prepStatus = sqlite3_prepare_v2(db, updateStatement.c_str(), -1, &preparedStatement, NULL);
@@ -674,11 +716,11 @@ int main(){
 						bindValueOrNull(db, preparedStatement, 3, "Customer Group Name");
 
 						//Now we bind the customer_ID.
-						bindStatus = sqlite3_bind_int(preparedStatement, 4, customerID);
+						auto bindStatus = sqlite3_bind_int(preparedStatement, 4, customerID);
 						if (bindStatus != SQLITE_OK)std::cerr << "Error binding customer ID to statement: " << sqlite3_errmsg(db) << '\n';
 
 						//Now we have our bindings, we execute the statement.
-						stepStatus = sqlite3_step(preparedStatement);
+						auto stepStatus = sqlite3_step(preparedStatement);
 						if (stepStatus != SQLITE_DONE)std::cerr << "Error executing UPDATE statement: " << sqlite3_errmsg(db) << '\n';	//As this is an insert of one line, we expect a result of SQLITE_OK
 						else {
 							std::cout << "Record updated successfully.\n";
@@ -687,18 +729,19 @@ int main(){
 						//And then we destruct this statement's connection to the DB.
 						sqlite3_finalize(preparedStatement);
 						break;
+					}
 
 
-					case 2:					//---------UPDATE CREDIT--------//
+					case 2: {					//---------UPDATE CREDIT--------//
 						updateStatement = "UPDATE Customers SET Credit_Limit = ?, Outstanding_Credit = ?,Updated_On = DATE('now') WHERE Customer_ID = ?;";
 						//Prepare our statement
-						prepStatus = sqlite3_prepare_v2(db, updateStatement.c_str(), -1, &preparedStatement, NULL);
+						auto prepStatus = sqlite3_prepare_v2(db, updateStatement.c_str(), -1, &preparedStatement, NULL);
 						if (prepStatus != SQLITE_OK)std::cerr << "Error preparing update statement: " << sqlite3_errmsg(db) << '\n';
 
 						//Bind our values
 						std::cout << "Please enter the customer's updated credit limit:\n";
 						int creditValue{ getInt() };
-						bindStatus = sqlite3_bind_int(preparedStatement, 1, creditValue);
+						auto bindStatus = sqlite3_bind_int(preparedStatement, 1, creditValue);
 						if (bindStatus != SQLITE_OK)std::cerr << "Error binding new credit limit: " << sqlite3_errmsg(db) << '\n';
 
 						std::cout << "Please enter the customer's updated outstanding credit:\n";
@@ -710,7 +753,7 @@ int main(){
 						if (bindStatus != SQLITE_OK)std::cerr << "Error binding customer ID to INSERT statement: " << sqlite3_errmsg(db) << '\n';
 
 						//Execute our statement
-						stepStatus = sqlite3_step(preparedStatement);
+						auto stepStatus = sqlite3_step(preparedStatement);
 						if (stepStatus != SQLITE_DONE)std::cerr << "Error executing UPDATE statement: " << sqlite3_errmsg(db) << '\n';	//As this is an insert of one line, we expect a result of SQLITE_OK
 						else {
 							std::cout << "Record updated successfully.\n";
@@ -719,6 +762,7 @@ int main(){
 						//And destruct our connection
 						sqlite3_finalize(preparedStatement);
 						break;
+					}
 					}
 
 
@@ -749,7 +793,7 @@ int main(){
 						//This one can't be NULL so we don't give them that option.
 						std::cout << "Please enter the updated first line of the address.\n";
 						std::getline(std::cin >> std::ws, inputLine);
-						bindStatus = sqlite3_bind_text(preparedStatement, 3, inputLine.c_str(), -1, SQLITE_TRANSIENT);
+						auto bindStatus = sqlite3_bind_text(preparedStatement, 3, inputLine.c_str(), -1, SQLITE_TRANSIENT);
 						if (bindStatus != SQLITE_OK)std::cerr << "Error binding address first line to statement:" << sqlite3_errmsg(db) << '\n';
 
 						//And we're back to values which can be NULL.
@@ -769,7 +813,7 @@ int main(){
 						if (bindStatus != SQLITE_OK)std::cerr << "Error binding address ID to statement:" << sqlite3_errmsg(db) << '\n';
 
 						//Now we've bound our values, we need to execute our statement
-						stepStatus = sqlite3_step(preparedStatement);
+						auto stepStatus = sqlite3_step(preparedStatement);
 						if (stepStatus != SQLITE_DONE)std::cerr << "Error executing UPDATE statement: " << sqlite3_errmsg(db) << '\n';
 						else std::cout << "Address updated successfully.\n \n";
 
@@ -810,15 +854,20 @@ int main(){
 						std::cout << "This command will delete all customer and address data associated with customer " << deleteShortName << ". Are you sure you would like to proceed? [y/n]\n";
 						bool proceedWithDelete{ getYesNo() };
 						if (proceedWithDelete) {
+							//executeStatement("BEGIN TRANSACTION", db);
 							//First we delete from the address table.
 							std::string deleteAddress{ "DELETE FROM CustomerAddress WHERE Customer_ID = ?;" };
 							prepStatus = sqlite3_prepare_v2(db, deleteAddress.c_str(), -1, &preparedStatement, NULL);
-							if (prepStatus != SQLITE_OK)std::cerr << "Error preparing delete statement: " << sqlite3_errmsg(db) << '\n';
+							if (prepStatus == SQLITE_OK) {
+								std::cerr << "Error preparing delete statement: " << sqlite3_errmsg(db) << '\n';
+								//executeStatement("ROLLBACK TRANSACTION", db);
+								break;
+							}
 							else {	//Bind the ID
-							bindStatus = sqlite3_bind_int(preparedStatement, 1, customerID);
+							auto bindStatus = sqlite3_bind_int(preparedStatement, 1, customerID);
 								if (bindStatus != SQLITE_OK)std::cerr << "Error binding Customer ID to statement: " << sqlite3_errmsg(db) << '\n';
 								else {	//Execute the statement
-									stepStatus = sqlite3_step(preparedStatement);
+									auto stepStatus = sqlite3_step(preparedStatement);
 									if (stepStatus != SQLITE_DONE)std::cerr << "Error executing DELETE statement: " << sqlite3_errmsg(db) << '\n';
 									else std::cout << "Addresses associated with customer " << deleteShortName << " deleted successfully.\n";
 								}
@@ -832,10 +881,10 @@ int main(){
 							prepStatus = sqlite3_prepare_v2(db, deleteCustomer.c_str(), -1, &preparedStatement, NULL);
 							if (prepStatus != SQLITE_OK)std::cerr << "Error preparing DELETE statement: " << sqlite3_errmsg(db) << '\n';
 							else {	//Bind the ID
-								bindStatus = sqlite3_bind_int(preparedStatement, 1, customerID);
+								auto bindStatus = sqlite3_bind_int(preparedStatement, 1, customerID);
 								if (bindStatus != SQLITE_OK)std::cerr << "Error binding Customer ID to statement: " << sqlite3_errmsg(db) << '\n';
 								else {	//Execute the statement
-									stepStatus = sqlite3_step(preparedStatement);
+									auto stepStatus = sqlite3_step(preparedStatement);
 									if (stepStatus != SQLITE_DONE)std::cerr << "Error executing DELETE statement: " << sqlite3_errmsg(db) << '\n';
 									else std::cout << "Customer data for " << deleteShortName << " deleted successfully.\n";
 								}
@@ -863,10 +912,10 @@ int main(){
 								if(preparedStatement!=SQLITE_OK)
 									if (prepStatus != SQLITE_OK)std::cerr << "Error preparing DELETE statement: " << sqlite3_errmsg(db) << '\n';
 									else {	//Bind the ID
-										bindStatus = sqlite3_bind_int(preparedStatement, 1, addressID);
+										auto bindStatus = sqlite3_bind_int(preparedStatement, 1, addressID);
 										if (bindStatus != SQLITE_OK)std::cerr << "Error binding Customer ID to statement: " << sqlite3_errmsg(db) << '\n';
 										else {	//Execute the statement
-											stepStatus = sqlite3_step(preparedStatement);
+											auto stepStatus = sqlite3_step(preparedStatement);
 											if (stepStatus != SQLITE_DONE)std::cerr << "Error executing DELETE statement: " << sqlite3_errmsg(db) << '\n';
 											else std::cout << "Address " << addressID << " deleted successfully.\n";
 										}
@@ -912,7 +961,7 @@ int main(){
 
 
 	//And now that we have done what we set out to do, we need to close our DB connection before exiting.
-	closeStatus = sqlite3_close(db);
+	auto closeStatus = sqlite3_close(db);
 	if (closeStatus!=SQLITE_OK) {
 		std::cerr << "Error closing DB: " << sqlite3_errmsg(db) << '\n';
 	}
@@ -921,46 +970,3 @@ int main(){
 }
 
 
-//This function exists to provide some pre-made sample data to the DB, and should be run if you're starting with an empty DB (or no DB at all).
-// I would ordinarily place it above main as per usual convention, but it's a huge block of ugly SQL code which will only ever be used once to generate a new set of sample data, so I've left it here.
-// While technically the INSERT OR IGNORE status means we could run this function at every program startup, I figure it's best to only run it when necessary.
-void insertSampleData(sqlite3* inDB) {
-	std::string stmt;
-	stmt = "INSERT OR IGNORE INTO Customers (Customer_ID, Customer_Short_Name, First_Name, Last_Name,  Group_Name, Credit_Limit,  Outstanding_Credit, Created_On, Updated_On) VALUES( 1, 'JSMITH', 'John', 'Smith',  'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(2,'MSMITH', 'Mary', 'Smith', 'SMITH FAMILY', ' 10000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(3,'BSMITH','Bob', 'Smith', 'SMITH FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(4,'BJONES', 'Brian', 'Jones', 'JONES FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(5,'DTRACEY', 'Donald', 'Tracey', 'TRACEY FAMILY', ' 3000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(6, 'ABAKER', 'Anthony', 'Baker', 'BAKER FAMILY', ' 5000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(7, 'AMCKECHNIE','Alastair', 'McKechnie', 'MCKECHNIE FAMILY', ' 7000', ' 0', DATE('now'), DATE('now')); \
-\
-	INSERT OR IGNORE INTO Customers(Customer_ID, Customer_Short_Name, First_Name, Last_Name, Group_Name, Credit_Limit, Outstanding_Credit, Created_On, Updated_On) VALUES(8, 'RGOULDING', 'Robert', 'Goulding', 'GOULDING', ' 5000', ' 0', DATE('now'), DATE('now')); ";
-
-	std::cout << "Adding sample Customer data:\n";
-	executeStatement(stmt, inDB);
-
-	stmt = "INSERT OR IGNORE INTO  CustomerAddress (Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(1,(select Customer_id from Customers where Customer_Short_Name = 'JSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
-		\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(2,(select Customer_ID from Customers where Customer_Short_Name = 'MSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(3,(select Customer_ID from Customers where Customer_Short_Name = 'BSMITH'), 'HOME', '', '1 Regent Road', 'London', 'W12 5GG', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(4,(select Customer_ID from Customers where Customer_Short_Name = 'JSMITH'), 'WORK', '', '26 Lombard Street', 'London', 'EC4', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(5,(select Customer_ID from Customers where Customer_Short_Name = 'DTRACEY'), 'HOME', '', '5 Bright Street', 'Dorking', 'Surrey', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(6,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'HOME', '', '21 Hope Street', 'Barnet', 'Middlesex', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(7,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'WORK', '', '1 Canada Square', 'Canary Wharf', 'London', '', '', DATE('now'), DATE('now')); \
-	\
-		INSERT OR IGNORE INTO  CustomerAddress(Address_ID, Customer_ID, Address_Type, Contact_Name, Address_Line_1, Address_Line_2, Address_Line_3, Address_Line_4, Address_Line_5, Created_On, Updated_On) VALUES(8,(select Customer_ID from Customers where Customer_Short_Name = 'ABAKER'), 'UNKNOWN', '', '17 Broad Street', 'London', 'EC3', '', '', DATE('now'), DATE('now'));";
-
-	std::cout << "Adding sample Address data: \n";
-	executeStatement(stmt, inDB);
-}
